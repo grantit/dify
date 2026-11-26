@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Chỉnh sửa {{name}}",
   "agentDetail.configure.tools.empty.description": "Công cụ giúp tác nhân hành động, như tìm kiếm web hoặc gọi ứng dụng của bạn",
   "agentDetail.configure.tools.empty.title": "Chưa có công cụ nào",
+  "agentDetail.configure.tools.identityBinding.conversation": "Để trống để gắn cuộc hội thoại hiện tại. Mô hình không thể đặt giá trị này.",
+  "agentDetail.configure.tools.identityBinding.user": "Để trống để gắn người dùng hiện tại. Mô hình không thể đặt giá trị này.",
   "agentDetail.configure.tools.label": "Công cụ",
   "agentDetail.configure.tools.moreActions": "Thêm hành động cho {{name}}",
   "agentDetail.configure.tools.removeAction": "Xóa {{name}}",

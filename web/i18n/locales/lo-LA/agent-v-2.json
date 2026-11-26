@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "ແກ້ໄຂ {{name}}",
   "agentDetail.configure.tools.empty.description": "ເຄື່ອງມືຊ່ວຍໃຫ້ຕົວແທນສາມາດປະຕິບັດການໄດ້ ເຊັ່ນ: ການຄົ້ນຫາເວັບ ຫຼື ການເອີ້ນໃຊ້ແອັບຯຂອງທ່ານ",
   "agentDetail.configure.tools.empty.title": "ຍັງບໍ່ມີເຄື່ອງມືເທື່ອ",
+  "agentDetail.configure.tools.identityBinding.conversation": "ປ່ອຍວ່າງເພື່ອຜູກການສົນທະນາປັດຈຸບັນ. ໂມເດວບໍ່ສາມາດຕັ້ງຄ່ານີ້ໄດ້.",
+  "agentDetail.configure.tools.identityBinding.user": "ປ່ອຍວ່າງເພື່ອຜູກຜູ້ໃຊ້ປັດຈຸບັນ. ໂມເດວບໍ່ສາມາດຕັ້ງຄ່ານີ້ໄດ້.",
   "agentDetail.configure.tools.label": "ເຄື່ອງມື (Tools)",
   "agentDetail.configure.tools.moreActions": "ການດຳເນີນການເພີ່ມເຕີມສຳລັບ {{name}}",
   "agentDetail.configure.tools.removeAction": "ລຶບ {{name}} ອອກ",

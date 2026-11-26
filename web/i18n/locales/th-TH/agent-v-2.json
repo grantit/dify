@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "แก้ไข {{name}}",
   "agentDetail.configure.tools.empty.description": "เครื่องมือช่วยให้ตัวแทนสามารถดำเนินการได้ เช่น ค้นหาเว็บหรือเรียกใช้แอปของคุณ",
   "agentDetail.configure.tools.empty.title": "ยังไม่มีเครื่องมือ",
+  "agentDetail.configure.tools.identityBinding.conversation": "เว้นว่างไว้เพื่อผูกกับบทสนทนาปัจจุบัน โมเดลไม่สามารถกำหนดค่านี้ได้",
+  "agentDetail.configure.tools.identityBinding.user": "เว้นว่างไว้เพื่อผูกกับผู้ใช้ปัจจุบัน โมเดลไม่สามารถกำหนดค่านี้ได้",
   "agentDetail.configure.tools.label": "เครื่องมือ",
   "agentDetail.configure.tools.moreActions": "การกระทำเพิ่มเติมสำหรับ {{name}}",
   "agentDetail.configure.tools.removeAction": "ลบ {{name}}",

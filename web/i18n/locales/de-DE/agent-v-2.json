@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "{{name}} bearbeiten",
   "agentDetail.configure.tools.empty.description": "Tools ermöglichen es dem Agenten zu handeln, z. B. das Web zu durchsuchen oder Ihre Apps aufzurufen",
   "agentDetail.configure.tools.empty.title": "Noch keine Tools",
+  "agentDetail.configure.tools.identityBinding.conversation": "Leer lassen, um die aktuelle Unterhaltung zu binden. Das Modell kann diesen Wert nicht setzen.",
+  "agentDetail.configure.tools.identityBinding.user": "Leer lassen, um den aktuellen Benutzer zu binden. Das Modell kann diesen Wert nicht setzen.",
   "agentDetail.configure.tools.label": "Tools",
   "agentDetail.configure.tools.moreActions": "Weitere Aktionen für {{name}}",
   "agentDetail.configure.tools.removeAction": "{{name}} entfernen",

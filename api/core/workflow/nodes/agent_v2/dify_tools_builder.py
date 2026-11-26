@@ -22,6 +22,7 @@ from core.plugin.provider_identity import normalize_plugin_daemon_provider_ident
 from core.tools.__base.tool import Tool
 from core.tools.entities.tool_entities import ToolProviderType
 from core.tools.errors import ToolProviderCredentialValidationError, ToolProviderNotFoundError
+from core.tools.mcp_tool.identity_bindings import apply_mcp_identity_bindings, first_present_text
 from core.tools.plugin_tool.tool import PluginTool
 from core.tools.tool_manager import ToolManager
 from core.tools.workflow_as_tool.provider import WorkflowToolProviderController
@@ -99,6 +100,8 @@ class WorkflowAgentDifyToolLayersBuilder(Protocol):
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...] = (),
+        identity_user_id: str | None = None,
+        conversation_id: str | None = None,
     ) -> WorkflowAgentToolLayers: ...
 
 
@@ -177,6 +180,8 @@ class WorkflowAgentDifyToolsBuilder:
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...] = (),
+        identity_user_id: str | None = None,
+        conversation_id: str | None = None,
     ) -> WorkflowAgentToolLayers:
         """Resolve user-selected Dify tools into direct/core Agent backend DTOs.
 
@@ -184,6 +189,11 @@ class WorkflowAgentDifyToolsBuilder:
         Composer test run, SERVICE_API / WEB_APP for a published run). It must
         be threaded through to `ToolManager` so credential quotas, rate limits,
         and audit tags match the actual call site.
+
+        `identity_user_id` and `conversation_id` are trusted session values for
+        MCP arguments that name the current user or conversation. A blank
+        `identity_user_id` falls back to `user_id`. Builder-saved runtime values
+        still win over both.
         """
         enabled_tools = [tool for tool in tools.dify_tools if tool.enabled]
         if not enabled_tools:
@@ -220,6 +230,16 @@ class WorkflowAgentDifyToolsBuilder:
                     invoke_from=invoke_from,
                     tool_config=normalized_tool_config,
                 )
+                if normalized_tool_config.provider_type is ToolProviderType.MCP:
+                    # The provider declaration still marks every MCP argument as
+                    # model input. Rebind identity arguments on this run's copy
+                    # before the LLM schema and runtime parameter map are built.
+                    apply_mcp_identity_bindings(
+                        tool_runtime,
+                        user_id=first_present_text(identity_user_id, user_id),
+                        conversation_id=conversation_id,
+                        configured_parameters=normalized_tool_config.runtime_parameters,
+                    )
 
                 if destination == "plugin":
                     prepared_plugin.append(

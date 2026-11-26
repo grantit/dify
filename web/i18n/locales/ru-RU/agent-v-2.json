@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Редактировать {{name}}",
   "agentDetail.configure.tools.empty.description": "Инструменты позволяют агенту действовать — например, искать в интернете или вызывать ваши приложения",
   "agentDetail.configure.tools.empty.title": "Пока нет инструментов",
+  "agentDetail.configure.tools.identityBinding.conversation": "Оставьте пустым, чтобы подставить текущий диалог. Модель не может задать это значение.",
+  "agentDetail.configure.tools.identityBinding.user": "Оставьте пустым, чтобы подставить текущего пользователя. Модель не может задать это значение.",
   "agentDetail.configure.tools.label": "Инструменты",
   "agentDetail.configure.tools.moreActions": "Дополнительные действия для {{name}}",
   "agentDetail.configure.tools.removeAction": "Удалить {{name}}",

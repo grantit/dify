@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "{{name}} संपादित करें",
   "agentDetail.configure.tools.empty.description": "उपकरण एजेंट को कार्य करने देते हैं, जैसे वेब खोजना या आपके ऐप्स को कॉल करना",
   "agentDetail.configure.tools.empty.title": "अभी तक कोई उपकरण नहीं",
+  "agentDetail.configure.tools.identityBinding.conversation": "वर्तमान बातचीत को बाँधने के लिए खाली छोड़ें। मॉडल यह मान सेट नहीं कर सकता।",
+  "agentDetail.configure.tools.identityBinding.user": "वर्तमान उपयोगकर्ता को बाँधने के लिए खाली छोड़ें। मॉडल यह मान सेट नहीं कर सकता।",
   "agentDetail.configure.tools.label": "उपकरण",
   "agentDetail.configure.tools.moreActions": "{{name}} के लिए और क्रियाएँ",
   "agentDetail.configure.tools.removeAction": "{{name}} हटाएँ",

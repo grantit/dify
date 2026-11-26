@@ -200,6 +200,7 @@ class WorkflowAgentRuntimeRequestBuilder:
                 tools=agent_soul.tools,
                 invoke_from=context.dify_context.invoke_from,
                 knowledge_fs_spaces=tuple(agent_soul.knowledge.spaces),
+                variable_pool=context.variable_pool,
             )
         except WorkflowAgentDifyToolsBuildError as error:
             raise WorkflowAgentRuntimeRequestBuildError(error.error_code, str(error)) from error
@@ -386,10 +387,14 @@ class WorkflowAgentRuntimeRequestBuilder:
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...],
+        variable_pool: VariablePoolReader,
     ) -> WorkflowAgentToolLayers:
         # Production workflow runs intentionally keep existing plugin configs on
         # the direct `dify.plugin.tools` route. This builder emits plugin tools
         # directly and non-plugin Dify tools through `dify.core.tools`.
+        # sys.user_id is the end-user session id for external callers and the
+        # account id for console callers. sys.conversation_id is the chatflow
+        # conversation. Both are session facts, not model arguments.
         return self._dify_tools_builder.build_layers(
             tenant_id=tenant_id,
             app_id=app_id,
@@ -397,6 +402,8 @@ class WorkflowAgentRuntimeRequestBuilder:
             tools=tools,
             invoke_from=invoke_from,
             knowledge_fs_spaces=knowledge_fs_spaces,
+            identity_user_id=get_system_text(variable_pool, SystemVariableKey.USER_ID),
+            conversation_id=get_system_text(variable_pool, SystemVariableKey.CONVERSATION_ID),
         )
 
     @staticmethod

@@ -7,13 +7,24 @@ from dataclasses import dataclass, field
 from unittest.mock import patch
 
 import pytest
+from pydantic import JsonValue
 from sqlalchemy import Connection, Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 import core.db.session_factory as session_factory_module
 from core.app.entities.app_invoke_entities import InvokeFrom, UserFrom
+from core.tools.__base.tool import Tool
 from core.tools.__base.tool_runtime import ToolRuntime
-from core.tools.entities.tool_entities import ToolInvokeFrom, ToolInvokeMessage, ToolProviderType
+from core.tools.entities.common_entities import I18nObject
+from core.tools.entities.tool_entities import (
+    ToolDescription,
+    ToolEntity,
+    ToolIdentity,
+    ToolInvokeFrom,
+    ToolInvokeMessage,
+    ToolParameter,
+    ToolProviderType,
+)
 from core.tools.errors import (
     ToolInvokeError,
     ToolParameterValidationError,
@@ -406,3 +417,162 @@ def test_invoke_maps_runtime_lookup_errors_to_service_error_codes(
             AgentToolInnerService().invoke(_request(), session=sqlite_session)
 
     assert exc_info.value.error_code == expected_code
+
+
+class _RecordingMcpTool(Tool):
+    """MCP tool whose provider declaration still exposes identity arguments to the model.
+
+    Agent v2 reloads the tool from the provider at invocation time, so this
+    starts from that declaration: form ``LLM`` and an empty runtime map.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            entity=ToolEntity(
+                identity=ToolIdentity(
+                    author="mcp",
+                    name="lookup",
+                    label=I18nObject(en_US="Lookup"),
+                    provider="mcp-server",
+                ),
+                description=ToolDescription(human=I18nObject(en_US="Lookup"), llm="Look up a record."),
+                parameters=[
+                    ToolParameter(
+                        name="query",
+                        label=I18nObject(en_US="Query"),
+                        type=ToolParameter.ToolParameterType.STRING,
+                        form=ToolParameter.ToolParameterForm.LLM,
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="user_id",
+                        label=I18nObject(en_US="User"),
+                        type=ToolParameter.ToolParameterType.STRING,
+                        form=ToolParameter.ToolParameterForm.LLM,
+                        required=True,
+                    ),
+                    ToolParameter(
+                        name="conversation_id",
+                        label=I18nObject(en_US="Conversation"),
+                        type=ToolParameter.ToolParameterType.STRING,
+                        form=ToolParameter.ToolParameterForm.LLM,
+                        required=True,
+                    ),
+                ],
+            ),
+            runtime=ToolRuntime(tenant_id="tenant-1", runtime_parameters={}),
+        )
+        self.seen: dict[str, object] | None = None
+
+    def tool_provider_type(self) -> ToolProviderType:
+        return ToolProviderType.MCP
+
+    def _invoke(
+        self,
+        session: Session,
+        user_id: str,
+        tool_parameters: dict[str, object],
+        conversation_id: str | None = None,
+        app_id: str | None = None,
+        message_id: str | None = None,
+    ) -> Generator[ToolInvokeMessage]:
+        del session, user_id, conversation_id, app_id, message_id
+        self.seen = dict(tool_parameters)
+        yield ToolInvokeMessage(
+            type=ToolInvokeMessage.MessageType.TEXT,
+            message=ToolInvokeMessage.TextMessage(text="ok"),
+        )
+
+
+def _mcp_request(
+    *,
+    runtime_parameters: dict[str, JsonValue],
+    tool_parameters: dict[str, JsonValue],
+    caller_user_id: str = "internal-user",
+    caller_conversation_id: str | None = "conversation-9",
+) -> AgentToolInvokeRequest:
+    request = _request()
+    request.caller.user_id = caller_user_id
+    request.caller.conversation_id = caller_conversation_id
+    request.tool.provider_type = "mcp"
+    request.tool.provider_id = "mcp-server"
+    request.tool.tool_name = "lookup"
+    request.tool.runtime_parameters = runtime_parameters
+    request.tool.tool_parameters = tool_parameters
+    return request
+
+
+def _invoke_mcp(sqlite_session: Session, request: AgentToolInvokeRequest) -> _RecordingMcpTool:
+    tool = _RecordingMcpTool()
+    with (
+        patch("services.agent_tool_inner_service.ToolManager.get_agent_tool_runtime", return_value=tool),
+        patch(
+            "services.agent_tool_inner_service.ToolFileMessageTransformer.transform_tool_invoke_messages",
+            side_effect=lambda messages, **_kwargs: messages,
+        ),
+    ):
+        response = AgentToolInnerService().invoke(request, session=sqlite_session)
+    assert response.observation == "ok"
+    return tool
+
+
+def test_agent_v2_mcp_invoke_uses_trusted_identity_when_the_model_sends_other_values(
+    sqlite_session: Session,
+) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_mcp(
+        sqlite_session,
+        _mcp_request(
+            runtime_parameters={"user_id": "end-user-session", "conversation_id": "conversation-9"},
+            tool_parameters={
+                "query": "ledger",
+                "user_id": "forged-user",
+                "conversation_id": "forged-conversation",
+            },
+            caller_user_id="internal-user",
+            caller_conversation_id="other-conversation",
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "end-user-session",
+        "conversation_id": "conversation-9",
+    }
+
+
+def test_agent_v2_mcp_invoke_injects_identity_when_the_model_omits_it(sqlite_session: Session) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_mcp(
+        sqlite_session,
+        _mcp_request(
+            runtime_parameters={},
+            tool_parameters={"query": "ledger"},
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "internal-user",
+        "conversation_id": "conversation-9",
+    }
+
+
+def test_agent_v2_mcp_invoke_blocks_a_forged_conversation_when_the_session_has_none(
+    sqlite_session: Session,
+) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_mcp(
+        sqlite_session,
+        _mcp_request(
+            runtime_parameters={},
+            tool_parameters={"query": "ledger", "user_id": "forged-user", "conversation_id": "forged-conversation"},
+            caller_conversation_id=None,
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "internal-user",
+        "conversation_id": "",
+    }
