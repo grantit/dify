@@ -121,11 +121,10 @@ class AgentToolInnerService:
             tool_runtime.runtime.tool_invoke_from = (
                 ToolInvokeFrom.WORKFLOW if request.caller.workflow_id is not None else ToolInvokeFrom.AGENT
             )
-            if agent_tool.provider_type is ToolProviderType.MCP:
-                # ToolManager reloads the provider declaration, whose MCP
-                # arguments are still model inputs, and therefore drops identity
-                # values that were prepared as runtime parameters. Reapply them
-                # from this request before model arguments are merged.
+            if agent_tool.provider_type in {ToolProviderType.MCP, ToolProviderType.WORKFLOW}:
+                # ToolManager reloads the provider declaration, which can drop
+                # identity values that were prepared as runtime parameters.
+                # Reapply them from this request before model arguments are merged.
                 apply_mcp_identity_bindings(
                     tool_runtime,
                     user_id=request.caller.user_id,

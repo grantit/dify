@@ -328,6 +328,109 @@ def test_tool_layers_receive_sys_user_and_conversation() -> None:
     assert recorder.conversation_id == "conversation-9"
 
 
+def test_tool_layers_fall_back_to_start_inputs_when_sys_conversation_is_missing() -> None:
+    """Direct workflow runs have no sys.conversation_id; a Start input is trusted."""
+
+    class _StartPool:
+        def get(self, selector: Sequence[str]) -> StringSegment | None:
+            if list(selector) == ["sys", "user_id"]:
+                return StringSegment(value="api-user")
+            return None
+
+        def get_by_prefix(self, prefix: str) -> dict[str, object]:
+            if prefix == "start":
+                return {"user_id": "start-user", "conversation_id": "from-start"}
+            return {}
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.identity_user_id: str | None = None
+            self.conversation_id: str | None = None
+
+        def build_layers(
+            self,
+            *,
+            tenant_id: str,
+            app_id: str,
+            user_id: str | None,
+            tools: AgentSoulToolsConfig,
+            invoke_from: InvokeFrom,
+            knowledge_fs_spaces: tuple[object, ...] = (),
+            identity_user_id: str | None = None,
+            conversation_id: str | None = None,
+        ) -> WorkflowAgentToolLayers:
+            del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+            self.identity_user_id = identity_user_id
+            self.conversation_id = conversation_id
+            return WorkflowAgentToolLayers()
+
+    recorder = _Recorder()
+    context = replace(_context(), variable_pool=_StartPool())
+    WorkflowAgentRuntimeRequestBuilder(dify_tools_builder=recorder)._build_tool_layers(
+        tenant_id=context.dify_context.tenant_id,
+        app_id=context.dify_context.app_id,
+        user_id=context.dify_context.user_id,
+        tools=AgentSoulToolsConfig(),
+        invoke_from=context.dify_context.invoke_from,
+        knowledge_fs_spaces=(),
+        variable_pool=context.variable_pool,
+    )
+
+    assert recorder.identity_user_id == "api-user"
+    assert recorder.conversation_id == "from-start"
+
+
+def test_tool_layers_prefer_sys_identity_over_start_inputs() -> None:
+    class _BothPool:
+        def get(self, selector: Sequence[str]) -> StringSegment | None:
+            if list(selector) == ["sys", "user_id"]:
+                return StringSegment(value="sys-user")
+            if list(selector) == ["sys", "conversation_id"]:
+                return StringSegment(value="sys-conversation")
+            return None
+
+        def get_by_prefix(self, prefix: str) -> dict[str, object]:
+            if prefix == "start":
+                return {"user_id": "start-user", "conversation_id": "start-conversation"}
+            return {}
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.identity_user_id: str | None = None
+            self.conversation_id: str | None = None
+
+        def build_layers(
+            self,
+            *,
+            tenant_id: str,
+            app_id: str,
+            user_id: str | None,
+            tools: AgentSoulToolsConfig,
+            invoke_from: InvokeFrom,
+            knowledge_fs_spaces: tuple[object, ...] = (),
+            identity_user_id: str | None = None,
+            conversation_id: str | None = None,
+        ) -> WorkflowAgentToolLayers:
+            del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+            self.identity_user_id = identity_user_id
+            self.conversation_id = conversation_id
+            return WorkflowAgentToolLayers()
+
+    recorder = _Recorder()
+    WorkflowAgentRuntimeRequestBuilder(dify_tools_builder=recorder)._build_tool_layers(
+        tenant_id="tenant-1",
+        app_id="app-1",
+        user_id="user-1",
+        tools=AgentSoulToolsConfig(),
+        invoke_from=InvokeFrom.SERVICE_API,
+        knowledge_fs_spaces=(),
+        variable_pool=_BothPool(),
+    )
+
+    assert recorder.identity_user_id == "sys-user"
+    assert recorder.conversation_id == "sys-conversation"
+
+
 @pytest.mark.parametrize("preview", [False, True])
 def test_builder_passes_inline_or_preview_context_to_application_tracing(preview: bool):
     from uuid import uuid4

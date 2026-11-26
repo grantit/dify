@@ -1411,3 +1411,149 @@ def test_plugin_tools_do_not_rebind_parameters_named_like_identity() -> None:
     assert "user_id" in schema["properties"]
     assert "conversationId" in schema["properties"]
     assert "user_id" in schema["required"]
+
+
+def _workflow_identity_tool(
+    *,
+    form: ToolParameter.ToolParameterForm = ToolParameter.ToolParameterForm.FORM,
+    runtime_parameters: dict[str, Any] | None = None,
+) -> FakeTool:
+    entity = ToolEntity(
+        identity=ToolIdentity(
+            author="workflow",
+            name="planit_memory_specialist",
+            label=I18nObject(en_US="Memory specialist"),
+            provider="workflow-provider-1",
+        ),
+        description=ToolDescription(human=I18nObject(en_US="Memory"), llm="Look up memory."),
+        parameters=[
+            _parameter("query", parameter_type=ToolParameter.ToolParameterType.STRING, required=True),
+            ToolParameter(
+                name="user_id",
+                label=I18nObject(en_US="User"),
+                type=ToolParameter.ToolParameterType.STRING,
+                form=form,
+                required=True,
+                llm_description="user_id",
+            ),
+            ToolParameter(
+                name="conversation_id",
+                label=I18nObject(en_US="Conversation"),
+                type=ToolParameter.ToolParameterType.STRING,
+                form=form,
+                required=True,
+                llm_description="conversation_id",
+            ),
+        ],
+    )
+    return FakeTool(
+        entity=entity,
+        runtime=ToolRuntime(
+            tenant_id="tenant-1",
+            user_id="internal-user",
+            credentials={},
+            runtime_parameters=dict(runtime_parameters or {}),
+        ),
+    )
+
+
+def _workflow_tools(runtime_parameters: dict[str, Any] | None = None) -> AgentSoulToolsConfig:
+    return AgentSoulToolsConfig.model_validate(
+        {
+            "dify_tools": [
+                {
+                    "provider_id": "workflow-provider-1",
+                    "provider_type": "workflow",
+                    "tool_name": "planit_memory_specialist",
+                    "credential_type": "unauthorized",
+                    "runtime_parameters": runtime_parameters or {},
+                }
+            ]
+        }
+    )
+
+
+def _build_workflow(
+    tool: FakeTool,
+    *,
+    identity_user_id: str | None,
+    conversation_id: str | None,
+    tools: AgentSoulToolsConfig,
+):
+    builder = WorkflowAgentDifyToolsBuilder(tool_runtime_provider=FakeRuntimeProvider(tool))
+    return builder.build_layers(
+        tenant_id="tenant-1",
+        app_id="app-1",
+        user_id="internal-user",
+        tools=tools,
+        invoke_from=InvokeFrom.SERVICE_API,
+        identity_user_id=identity_user_id,
+        conversation_id=conversation_id,
+    )
+
+
+def test_workflow_identity_form_parameters_are_bound_when_runtime_parameters_are_empty() -> None:
+    """Official WaT exports leave required form identity parameters out of runtime_parameters."""
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert tool.parameters_json_schema["properties"].keys() == {"query"}
+    assert tool.parameters_json_schema["required"] == ["query"]
+    assert tool.runtime_parameters["user_id"] == "end-user-session"
+    assert tool.runtime_parameters["conversation_id"] == "conversation-9"
+    forms = {parameter.name: parameter.form for parameter in tool.parameters}
+    assert forms["user_id"] == "form"
+    assert forms["conversation_id"] == "form"
+    assert forms["query"] == "llm"
+
+
+def test_workflow_identity_llm_parameters_are_hidden_and_bound_from_the_session() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(form=ToolParameter.ToolParameterForm.LLM),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert "user_id" not in tool.parameters_json_schema["properties"]
+    assert "conversation_id" not in tool.parameters_json_schema["properties"]
+    assert tool.runtime_parameters["user_id"] == "end-user-session"
+    assert tool.runtime_parameters["conversation_id"] == "conversation-9"
+
+
+def test_workflow_identity_arguments_keep_a_builder_value_and_fill_blanks_from_the_session() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools({"user_id": "workspace-override", "conversation_id": "  "}),
+    )
+
+    assert result.core_tools is not None
+    runtime_parameters = result.core_tools.tools[0].runtime_parameters
+    assert runtime_parameters["user_id"] == "workspace-override"
+    assert runtime_parameters["conversation_id"] == "conversation-9"
+
+
+def test_workflow_identity_arguments_stay_bound_when_the_session_has_no_conversation() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id=None,
+        conversation_id=None,
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert "user_id" not in tool.parameters_json_schema["properties"]
+    assert "conversation_id" not in tool.parameters_json_schema["properties"]
+    assert tool.runtime_parameters["user_id"] == "internal-user"
+    assert tool.runtime_parameters["conversation_id"] == ""

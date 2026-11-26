@@ -191,9 +191,10 @@ class WorkflowAgentDifyToolsBuilder:
         and audit tags match the actual call site.
 
         `identity_user_id` and `conversation_id` are trusted session values for
-        MCP arguments that name the current user or conversation. A blank
-        `identity_user_id` falls back to `user_id`. Builder-saved runtime values
-        still win over both.
+        MCP and Workflow-as-Tool arguments that name the current user or
+        conversation. A blank `identity_user_id` falls back to `user_id`.
+        Builder-saved runtime values still win over both. Empty values stay
+        bound as form/runtime parameters so the model cannot invent them.
         """
         enabled_tools = [tool for tool in tools.dify_tools if tool.enabled]
         if not enabled_tools:
@@ -230,10 +231,11 @@ class WorkflowAgentDifyToolsBuilder:
                     invoke_from=invoke_from,
                     tool_config=normalized_tool_config,
                 )
-                if normalized_tool_config.provider_type is ToolProviderType.MCP:
-                    # The provider declaration still marks every MCP argument as
-                    # model input. Rebind identity arguments on this run's copy
-                    # before the LLM schema and runtime parameter map are built.
+                if normalized_tool_config.provider_type in {ToolProviderType.MCP, ToolProviderType.WORKFLOW}:
+                    # MCP declarations mark every argument as a model input.
+                    # Workflow-as-Tool exports often leave required form identity
+                    # parameters out of runtime_parameters. Rebind both on this
+                    # run's copy before the LLM schema and runtime map are built.
                     apply_mcp_identity_bindings(
                         tool_runtime,
                         user_id=first_present_text(identity_user_id, user_id),

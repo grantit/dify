@@ -1,9 +1,9 @@
-"""Trusted user and conversation bindings for MCP tool arguments.
+"""Trusted user and conversation bindings for MCP and Workflow tool arguments.
 
-Some MCP tools declare arguments that mean the authenticated end user or the
-current conversation. Those values are session facts. Agent v2 keeps them out
-of the model-facing schema and supplies them as form/runtime values so a model
-argument cannot invent or replace them.
+Some MCP and Workflow-as-Tool tools declare arguments that mean the
+authenticated end user or the current conversation. Those values are session
+facts. Agent v2 keeps them out of the model-facing schema and supplies them as
+form/runtime values so a model argument cannot invent or replace them.
 
 The recognized names, after lowercasing and removing non-alphanumeric
 characters, are:
@@ -163,3 +163,92 @@ def _bind_identity_parameter(
             "required": False,
         }
     )
+
+
+def present_variable_text(value: object) -> str | None:
+    """Return a stripped string from a raw value or a variable-pool segment.
+
+    Preconditions: none.
+    Postconditions: the result is a non-empty string or ``None``. Numbers and
+    other non-text values are absent, matching :func:`present_text`.
+    """
+
+    text = present_text(value)
+    if text is not None:
+        return text
+    for attribute in ("text", "value"):
+        text = present_text(getattr(value, attribute, None))
+        if text is not None:
+            return text
+    return None
+
+
+def identity_text_from_mapping(
+    mapping: Mapping[str, Any] | None,
+    kind: McpIdentityParameterKind,
+) -> str | None:
+    """Return the first present identity value of ``kind`` in ``mapping``.
+
+    Preconditions: ``mapping`` is Start inputs, runtime parameters, or another
+    trusted key/value document. Model arguments must not be passed here.
+    Postconditions: returns the first non-blank text whose key matches ``kind``,
+    or ``None`` when no such value is present.
+    """
+
+    if not mapping:
+        return None
+    for name, value in mapping.items():
+        if mcp_identity_parameter_kind(str(name)) != kind:
+            continue
+        text = present_variable_text(value)
+        if text is not None:
+            return text
+    return None
+
+
+_START_INPUT_PREFIXES = ("start", "__snippet_virtual_start__")
+
+
+def identity_text_from_start_inputs(
+    variable_pool: Any,
+    kind: McpIdentityParameterKind,
+) -> str | None:
+    """Return a Start-input identity value of ``kind`` from ``variable_pool``.
+
+    Preconditions: ``variable_pool`` implements ``get_by_prefix``. Only the
+    legacy ``start`` node and the snippet virtual Start node are read, so a
+    mid-graph output with the same name is ignored.
+    Postconditions: returns that Start text, or ``None`` when it is absent.
+    """
+
+    get_by_prefix = getattr(variable_pool, "get_by_prefix", None)
+    if get_by_prefix is None:
+        return None
+    for prefix in _START_INPUT_PREFIXES:
+        text = identity_text_from_mapping(get_by_prefix(prefix), kind)
+        if text is not None:
+            return text
+    return None
+
+
+def resolve_workflow_conversation_id(
+    *,
+    forwarded_conversation_id: object = None,
+    forwarded: bool = False,
+    inputs: Mapping[str, Any] | None = None,
+) -> str | None:
+    """Choose the trusted conversation id for a workflow run.
+
+    Preconditions: ``forwarded`` is true when a parent session already decided
+    the value, including when that value is blank (Workflow-as-Tool). ``inputs``
+    are trusted Start inputs from a direct workflow run such as
+    ``/v1/workflows/run``. They must not be model-invented tool arguments.
+    Postconditions: a forwarded parent value is returned as present text, or
+    ``None`` when it is blank, and Start inputs are not consulted. When nothing
+    was forwarded, the first conversation Start input is used. An empty result
+    stays empty; it is never invented.
+    """
+
+    if forwarded:
+        return present_text(forwarded_conversation_id)
+    return identity_text_from_mapping(inputs, "conversation")

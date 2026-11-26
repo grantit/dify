@@ -576,3 +576,123 @@ def test_agent_v2_mcp_invoke_blocks_a_forged_conversation_when_the_session_has_n
         "user_id": "internal-user",
         "conversation_id": "",
     }
+
+
+class _RecordingWorkflowTool(_RecordingMcpTool):
+    """Workflow-as-Tool whose required form identity parameters were not exported."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entity = self.entity.model_copy(
+            update={
+                "identity": self.entity.identity.model_copy(
+                    update={"author": "workflow", "name": "planit_memory_specialist", "provider": "workflow-1"}
+                ),
+                "parameters": [
+                    parameter.model_copy(update={"form": ToolParameter.ToolParameterForm.FORM})
+                    if parameter.name in {"user_id", "conversation_id"}
+                    else parameter
+                    for parameter in self.entity.parameters
+                ],
+            }
+        )
+
+    def tool_provider_type(self) -> ToolProviderType:
+        return ToolProviderType.WORKFLOW
+
+
+def _workflow_request(
+    *,
+    runtime_parameters: dict[str, JsonValue],
+    tool_parameters: dict[str, JsonValue],
+    caller_user_id: str = "internal-user",
+    caller_conversation_id: str | None = "conversation-9",
+) -> AgentToolInvokeRequest:
+    request = _mcp_request(
+        runtime_parameters=runtime_parameters,
+        tool_parameters=tool_parameters,
+        caller_user_id=caller_user_id,
+        caller_conversation_id=caller_conversation_id,
+    )
+    request.tool.provider_type = "workflow"
+    request.tool.provider_id = "workflow-1"
+    request.tool.tool_name = "planit_memory_specialist"
+    return request
+
+
+def _invoke_workflow(sqlite_session: Session, request: AgentToolInvokeRequest) -> _RecordingWorkflowTool:
+    tool = _RecordingWorkflowTool()
+    with (
+        patch("services.agent_tool_inner_service.ToolManager.get_agent_tool_runtime", return_value=tool),
+        patch(
+            "services.agent_tool_inner_service.ToolFileMessageTransformer.transform_tool_invoke_messages",
+            side_effect=lambda messages, **_kwargs: messages,
+        ),
+    ):
+        response = AgentToolInnerService().invoke(request, session=sqlite_session)
+    assert response.observation == "ok"
+    return tool
+
+
+def test_agent_v2_workflow_invoke_uses_trusted_identity_when_the_model_sends_other_values(
+    sqlite_session: Session,
+) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_workflow(
+        sqlite_session,
+        _workflow_request(
+            runtime_parameters={"user_id": "end-user-session", "conversation_id": "conversation-9"},
+            tool_parameters={
+                "query": "ledger",
+                "user_id": "forged-user",
+                "conversation_id": "forged-conversation",
+            },
+            caller_user_id="internal-user",
+            caller_conversation_id="other-conversation",
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "end-user-session",
+        "conversation_id": "conversation-9",
+    }
+
+
+def test_agent_v2_workflow_invoke_injects_identity_when_runtime_parameters_are_empty(
+    sqlite_session: Session,
+) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_workflow(
+        sqlite_session,
+        _workflow_request(
+            runtime_parameters={},
+            tool_parameters={"query": "ledger"},
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "internal-user",
+        "conversation_id": "conversation-9",
+    }
+
+
+def test_agent_v2_workflow_invoke_blocks_a_forged_conversation_when_the_session_has_none(
+    sqlite_session: Session,
+) -> None:
+    _persist_app(sqlite_session)
+    tool = _invoke_workflow(
+        sqlite_session,
+        _workflow_request(
+            runtime_parameters={},
+            tool_parameters={"query": "ledger", "user_id": "forged-user", "conversation_id": "forged-conversation"},
+            caller_conversation_id=None,
+        ),
+    )
+
+    assert tool.seen == {
+        "query": "ledger",
+        "user_id": "internal-user",
+        "conversation_id": "",
+    }

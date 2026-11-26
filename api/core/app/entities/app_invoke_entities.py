@@ -349,6 +349,13 @@ class WorkflowAppGenerateEntity(AppGenerateEntity):
     )
     # Legacy synchronous Tool callers cannot resume a paused execution.
     allow_human_input: bool = True
+    # Optional conversation for this workflow run. A parent Chatflow forwards
+    # its session id when this workflow is invoked as a tool. Direct API runs
+    # such as `/v1/workflows/run` may instead resolve it from a Start input.
+    conversation_id: str | None = None
+    # When true, `conversation_id` came from a parent session (including a
+    # blank value). Start inputs must not replace or invent it.
+    conversation_id_from_parent: bool = False
 
     class SingleIterationRunEntity(BaseModel):
         """
