@@ -69,6 +69,35 @@ def mcp_identity_parameter_kind(name: str) -> McpIdentityParameterKind | None:
     return None
 
 
+def is_bindable_identity_parameter(parameter: ToolParameter) -> bool:
+    """Return whether ``parameter`` is a trusted identity argument that can be bound.
+
+    Preconditions: ``parameter`` is a declared tool parameter.
+    Postconditions: true only for a recognized user or conversation name whose
+    type is string or unconstrained.
+    """
+
+    return mcp_identity_parameter_kind(parameter.name) is not None and parameter.type in _BINDABLE_PARAMETER_TYPES
+
+
+def bound_identity_form_value(parameter: ToolParameter, value: object) -> str | None:
+    """Return an already-bound identity form value, including a blank string.
+
+    Preconditions: ``parameter`` is a declared tool parameter. ``value`` comes
+    from trusted runtime parameters, never from model arguments.
+
+    Postconditions: a bindable identity argument whose runtime value is a
+    string, including ``""``, is returned as that string. ``None`` means the
+    value is not an already-bound identity form string. Unlike
+    :func:`present_text`, a bound empty string is kept so ToolManager does not
+    treat it as a missing required FORM parameter.
+    """
+
+    if not is_bindable_identity_parameter(parameter) or not isinstance(value, str):
+        return None
+    return value
+
+
 def present_text(value: object) -> str | None:
     """Return a stripped string, or ``None`` when ``value`` is blank or not text.
 

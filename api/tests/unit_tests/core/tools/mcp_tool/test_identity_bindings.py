@@ -1,8 +1,12 @@
 from types import SimpleNamespace
 
+from core.tools.entities.common_entities import I18nObject
+from core.tools.entities.tool_entities import ToolParameter
 from core.tools.mcp_tool.identity_bindings import (
+    bound_identity_form_value,
     identity_text_from_mapping,
     identity_text_from_start_inputs,
+    is_bindable_identity_parameter,
     mcp_identity_parameter_kind,
     present_text,
     present_variable_text,
@@ -92,3 +96,39 @@ def test_resolve_workflow_conversation_id_prefers_a_forwarded_parent_even_when_b
         == "from-start"
     )
     assert resolve_workflow_conversation_id(forwarded=False, inputs={"query": "hello"}) is None
+
+
+def _string_parameter(name: str, *, required: bool = True) -> ToolParameter:
+    return ToolParameter(
+        name=name,
+        label=I18nObject(en_US=name),
+        type=ToolParameter.ToolParameterType.STRING,
+        form=ToolParameter.ToolParameterForm.FORM,
+        required=required,
+    )
+
+
+def test_bound_identity_form_value_keeps_an_explicit_empty_string() -> None:
+    conversation = _string_parameter("conversation_id")
+    user = _string_parameter("user_id")
+    query = _string_parameter("query")
+    object_user = ToolParameter(
+        name="user_id",
+        label=I18nObject(en_US="user"),
+        type=ToolParameter.ToolParameterType.OBJECT,
+        form=ToolParameter.ToolParameterForm.FORM,
+        required=True,
+    )
+
+    assert is_bindable_identity_parameter(conversation) is True
+    assert is_bindable_identity_parameter(user) is True
+    assert is_bindable_identity_parameter(query) is False
+    assert is_bindable_identity_parameter(object_user) is False
+    assert bound_identity_form_value(conversation, "") == ""
+    assert bound_identity_form_value(conversation, "conversation-9") == "conversation-9"
+    assert bound_identity_form_value(user, "") == ""
+    assert bound_identity_form_value(conversation, None) is None
+    assert bound_identity_form_value(query, "") is None
+    assert bound_identity_form_value(object_user, "") is None
+    # present_text still treats blank as absent; the form helper must not.
+    assert present_text("") is None

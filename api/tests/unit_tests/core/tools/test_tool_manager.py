@@ -1475,3 +1475,45 @@ def test_convert_tool_parameters_type_model_selector_from_constant_value_config(
             "voice": "Cherry",
         }
     }
+
+
+def _required_form_string_parameter(name: str) -> ToolParameter:
+    parameter = ToolParameter.get_simple_instance(
+        name=name,
+        llm_description=name,
+        typ=ToolParameter.ToolParameterType.STRING,
+        required=True,
+    )
+    parameter.form = ToolParameter.ToolParameterForm.FORM
+    return parameter
+
+
+def test_convert_tool_parameters_type_keeps_bound_empty_identity_strings():
+    """Reproduce the invoke-time crash: a reloaded required FORM identity
+    declaration plus runtime_parameters[conversation_id] = "".
+
+    init_frontend_parameter treats "" as missing. Identity params that were
+    already bound, including a blank session, must still convert successfully.
+    """
+
+    conversation = _required_form_string_parameter("conversation_id")
+    user = _required_form_string_parameter("userId")
+    query = _required_form_string_parameter("query")
+
+    converted = ToolManager._convert_tool_parameters_type(
+        parameters=[conversation, user, query],
+        variable_pool=None,
+        tool_configurations={"conversation_id": "", "userId": "", "query": "ledger"},
+        typ="agent",
+        use_default_for_missing_form_parameters=True,
+    )
+    assert converted == {"conversation_id": "", "userId": "", "query": "ledger"}
+
+    with pytest.raises(ValueError, match="tool parameter query not found in tool config"):
+        ToolManager._convert_tool_parameters_type(
+            parameters=[query],
+            variable_pool=None,
+            tool_configurations={"query": ""},
+            typ="agent",
+            use_default_for_missing_form_parameters=True,
+        )

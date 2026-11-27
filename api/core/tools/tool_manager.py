@@ -41,6 +41,7 @@ from core.tools.entities.tool_entities import (
     emoji_icon_adapter,
 )
 from core.tools.errors import ToolProviderNotFoundError
+from core.tools.mcp_tool.identity_bindings import bound_identity_form_value
 from core.tools.mcp_tool.provider import MCPToolProviderController
 from core.tools.mcp_tool.tool import MCPTool
 from core.tools.plugin_tool.provider import PluginToolProviderController
@@ -1108,6 +1109,14 @@ class ToolManager:
 
                 else:
                     parameter_value = tool_configurations.get(parameter.name)
+                    bound_identity_value = bound_identity_form_value(parameter, parameter_value)
+                    if bound_identity_value is not None:
+                        # Bound identity values, including "", are session facts
+                        # already supplied at runtime. init_frontend_parameter
+                        # treats "" as missing and would raise before identity
+                        # bindings can relax required on the reloaded declaration.
+                        runtime_parameters[parameter.name] = bound_identity_value
+                        continue
                     if use_default_for_missing_form_parameters and parameter_value is None:
                         if parameter.default is not None:
                             parameter_value = parameter.default
