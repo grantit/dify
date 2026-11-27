@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "تعديل {{name}}",
   "agentDetail.configure.tools.empty.description": "تتيح الأدوات للوكيل التصرف، مثل البحث على الويب أو استدعاء تطبيقاتك",
   "agentDetail.configure.tools.empty.title": "لا توجد أدوات بعد",
+  "agentDetail.configure.tools.identityBinding.conversation": "اتركه فارغًا لربط المحادثة الحالية. لا يمكن للنموذج ضبط هذه القيمة.",
+  "agentDetail.configure.tools.identityBinding.user": "اتركه فارغًا لربط المستخدم الحالي. لا يمكن للنموذج ضبط هذه القيمة.",
   "agentDetail.configure.tools.label": "الأدوات",
   "agentDetail.configure.tools.moreActions": "إجراءات أخرى لـ {{name}}",
   "agentDetail.configure.tools.removeAction": "إزالة {{name}}",

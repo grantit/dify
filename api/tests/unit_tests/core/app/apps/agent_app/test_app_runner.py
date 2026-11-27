@@ -111,8 +111,19 @@ class _NoToolsBuilder:
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...] = (),
+        identity_user_id: str | None = None,
+        conversation_id: str | None = None,
     ) -> WorkflowAgentToolLayers:
-        del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+        del (
+            tenant_id,
+            app_id,
+            user_id,
+            tools,
+            invoke_from,
+            knowledge_fs_spaces,
+            identity_user_id,
+            conversation_id,
+        )
         return WorkflowAgentToolLayers()
 
 

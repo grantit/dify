@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Edit {{name}}",
   "agentDetail.configure.tools.empty.description": "Alat memungkinkan agen bertindak, seperti mencari di web atau memanggil aplikasi Anda",
   "agentDetail.configure.tools.empty.title": "Belum ada alat",
+  "agentDetail.configure.tools.identityBinding.conversation": "Kosongkan untuk mengikat percakapan saat ini. Model tidak dapat mengatur nilai ini.",
+  "agentDetail.configure.tools.identityBinding.user": "Kosongkan untuk mengikat pengguna saat ini. Model tidak dapat mengatur nilai ini.",
   "agentDetail.configure.tools.label": "Alat",
   "agentDetail.configure.tools.moreActions": "Tindakan lainnya untuk {{name}}",
   "agentDetail.configure.tools.removeAction": "Hapus {{name}}",

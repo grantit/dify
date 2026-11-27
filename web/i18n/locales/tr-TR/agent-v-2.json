@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "{{name}} düzenle",
   "agentDetail.configure.tools.empty.description": "Araçlar, ajanın web aramak veya uygulamalarınızı çağırmak gibi eylemler gerçekleştirmesini sağlar",
   "agentDetail.configure.tools.empty.title": "Henüz araç yok",
+  "agentDetail.configure.tools.identityBinding.conversation": "Geçerli konuşmayı bağlamak için boş bırakın. Model bu değeri ayarlayamaz.",
+  "agentDetail.configure.tools.identityBinding.user": "Geçerli kullanıcıyı bağlamak için boş bırakın. Model bu değeri ayarlayamaz.",
   "agentDetail.configure.tools.label": "Araçlar",
   "agentDetail.configure.tools.moreActions": "{{name}} için daha fazla eylem",
   "agentDetail.configure.tools.removeAction": "{{name}} kaldır",

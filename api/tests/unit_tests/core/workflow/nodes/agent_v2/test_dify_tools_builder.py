@@ -1262,3 +1262,298 @@ def test_list_provider_tool_names_reads_builtin_provider(monkeypatch: pytest.Mon
 
     assert names == ["ddg_search", "ddg_news"]
     assert captured == {"provider_id": "langgenius/duckduckgo/duckduckgo", "tenant_id": "tenant-1"}
+
+
+def _parameter(name: str, *, parameter_type: ToolParameter.ToolParameterType, required: bool = False) -> ToolParameter:
+    return ToolParameter(
+        name=name,
+        label=I18nObject(en_US=name),
+        type=parameter_type,
+        form=ToolParameter.ToolParameterForm.LLM,
+        required=required,
+        llm_description=name,
+    )
+
+
+def _mcp_identity_tool() -> FakeTool:
+    entity = ToolEntity(
+        identity=ToolIdentity(
+            author="mcp",
+            name="lookup",
+            label=I18nObject(en_US="Lookup"),
+            provider="mcp-server",
+        ),
+        description=ToolDescription(human=I18nObject(en_US="Lookup"), llm="Look up a record."),
+        parameters=[
+            _parameter("query", parameter_type=ToolParameter.ToolParameterType.STRING, required=True),
+            _parameter("user_id", parameter_type=ToolParameter.ToolParameterType.STRING, required=True),
+            _parameter("conversationId", parameter_type=ToolParameter.ToolParameterType.STRING, required=True),
+            _parameter("username", parameter_type=ToolParameter.ToolParameterType.STRING),
+            _parameter("user", parameter_type=ToolParameter.ToolParameterType.OBJECT),
+        ],
+    )
+    return FakeTool(
+        entity=entity,
+        runtime=ToolRuntime(tenant_id="tenant-1", user_id="internal-user", credentials={}, runtime_parameters={}),
+    )
+
+
+def _mcp_tools(runtime_parameters: dict[str, Any] | None = None) -> AgentSoulToolsConfig:
+    return AgentSoulToolsConfig.model_validate(
+        {
+            "dify_tools": [
+                {
+                    "provider_id": "mcp-server",
+                    "provider_type": "mcp",
+                    "tool_name": "lookup",
+                    "credential_type": "unauthorized",
+                    "runtime_parameters": runtime_parameters or {},
+                }
+            ]
+        }
+    )
+
+
+def _build_mcp(
+    tool: FakeTool,
+    *,
+    identity_user_id: str | None,
+    conversation_id: str | None,
+    tools: AgentSoulToolsConfig,
+):
+    builder = WorkflowAgentDifyToolsBuilder(
+        tool_runtime_provider=FakeRuntimeProvider(tool),
+        mcp_provider_id_resolver=lambda *, tenant_id, provider_id: provider_id,
+    )
+    return builder.build_layers(
+        tenant_id="tenant-1",
+        app_id="app-1",
+        user_id="internal-user",
+        tools=tools,
+        invoke_from=InvokeFrom.SERVICE_API,
+        identity_user_id=identity_user_id,
+        conversation_id=conversation_id,
+    )
+
+
+def test_mcp_identity_arguments_are_bound_from_the_session_and_hidden_from_the_model() -> None:
+    result = _build_mcp(
+        _mcp_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_mcp_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert tool.parameters_json_schema["properties"].keys() == {"query", "username", "user"}
+    assert tool.parameters_json_schema["required"] == ["query"]
+    assert tool.runtime_parameters["user_id"] == "end-user-session"
+    assert tool.runtime_parameters["conversationId"] == "conversation-9"
+    forms = {parameter.name: parameter.form for parameter in tool.parameters}
+    assert forms["user_id"] == "form"
+    assert forms["conversationId"] == "form"
+    assert forms["query"] == "llm"
+    assert forms["username"] == "llm"
+    assert forms["user"] == "llm"
+
+
+def test_mcp_identity_arguments_keep_a_builder_value_and_fill_blanks_from_the_session() -> None:
+    result = _build_mcp(
+        _mcp_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_mcp_tools({"user_id": "workspace-override", "conversationId": "  "}),
+    )
+
+    assert result.core_tools is not None
+    runtime_parameters = result.core_tools.tools[0].runtime_parameters
+    assert runtime_parameters["user_id"] == "workspace-override"
+    assert runtime_parameters["conversationId"] == "conversation-9"
+
+
+def test_mcp_identity_arguments_stay_bound_when_the_session_has_no_conversation() -> None:
+    result = _build_mcp(
+        _mcp_identity_tool(),
+        identity_user_id=None,
+        conversation_id=None,
+        tools=_mcp_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert "user_id" not in tool.parameters_json_schema["properties"]
+    assert "conversationId" not in tool.parameters_json_schema["properties"]
+    assert tool.runtime_parameters["user_id"] == "internal-user"
+    assert tool.runtime_parameters["conversationId"] == ""
+
+
+def test_plugin_tools_do_not_rebind_parameters_named_like_identity() -> None:
+    builder = WorkflowAgentDifyToolsBuilder(tool_runtime_provider=FakeRuntimeProvider(_mcp_identity_tool()))
+    result = _build(
+        builder,
+        AgentSoulToolsConfig.model_validate(
+            {
+                "dify_tools": [
+                    {
+                        "provider_id": "langgenius/search/search",
+                        "provider_type": "plugin",
+                        "tool_name": "lookup",
+                        "credential_type": "unauthorized",
+                    }
+                ]
+            }
+        ),
+    )
+
+    assert result is not None
+    schema = result.tools[0].parameters_json_schema
+    assert "user_id" in schema["properties"]
+    assert "conversationId" in schema["properties"]
+    assert "user_id" in schema["required"]
+
+
+def _workflow_identity_tool(
+    *,
+    form: ToolParameter.ToolParameterForm = ToolParameter.ToolParameterForm.FORM,
+    runtime_parameters: dict[str, Any] | None = None,
+) -> FakeTool:
+    entity = ToolEntity(
+        identity=ToolIdentity(
+            author="workflow",
+            name="planit_memory_specialist",
+            label=I18nObject(en_US="Memory specialist"),
+            provider="workflow-provider-1",
+        ),
+        description=ToolDescription(human=I18nObject(en_US="Memory"), llm="Look up memory."),
+        parameters=[
+            _parameter("query", parameter_type=ToolParameter.ToolParameterType.STRING, required=True),
+            ToolParameter(
+                name="user_id",
+                label=I18nObject(en_US="User"),
+                type=ToolParameter.ToolParameterType.STRING,
+                form=form,
+                required=True,
+                llm_description="user_id",
+            ),
+            ToolParameter(
+                name="conversation_id",
+                label=I18nObject(en_US="Conversation"),
+                type=ToolParameter.ToolParameterType.STRING,
+                form=form,
+                required=True,
+                llm_description="conversation_id",
+            ),
+        ],
+    )
+    return FakeTool(
+        entity=entity,
+        runtime=ToolRuntime(
+            tenant_id="tenant-1",
+            user_id="internal-user",
+            credentials={},
+            runtime_parameters=dict(runtime_parameters or {}),
+        ),
+    )
+
+
+def _workflow_tools(runtime_parameters: dict[str, Any] | None = None) -> AgentSoulToolsConfig:
+    return AgentSoulToolsConfig.model_validate(
+        {
+            "dify_tools": [
+                {
+                    "provider_id": "workflow-provider-1",
+                    "provider_type": "workflow",
+                    "tool_name": "planit_memory_specialist",
+                    "credential_type": "unauthorized",
+                    "runtime_parameters": runtime_parameters or {},
+                }
+            ]
+        }
+    )
+
+
+def _build_workflow(
+    tool: FakeTool,
+    *,
+    identity_user_id: str | None,
+    conversation_id: str | None,
+    tools: AgentSoulToolsConfig,
+):
+    builder = WorkflowAgentDifyToolsBuilder(tool_runtime_provider=FakeRuntimeProvider(tool))
+    return builder.build_layers(
+        tenant_id="tenant-1",
+        app_id="app-1",
+        user_id="internal-user",
+        tools=tools,
+        invoke_from=InvokeFrom.SERVICE_API,
+        identity_user_id=identity_user_id,
+        conversation_id=conversation_id,
+    )
+
+
+def test_workflow_identity_form_parameters_are_bound_when_runtime_parameters_are_empty() -> None:
+    """Official WaT exports leave required form identity parameters out of runtime_parameters."""
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert tool.parameters_json_schema["properties"].keys() == {"query"}
+    assert tool.parameters_json_schema["required"] == ["query"]
+    assert tool.runtime_parameters["user_id"] == "end-user-session"
+    assert tool.runtime_parameters["conversation_id"] == "conversation-9"
+    forms = {parameter.name: parameter.form for parameter in tool.parameters}
+    assert forms["user_id"] == "form"
+    assert forms["conversation_id"] == "form"
+    assert forms["query"] == "llm"
+
+
+def test_workflow_identity_llm_parameters_are_hidden_and_bound_from_the_session() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(form=ToolParameter.ToolParameterForm.LLM),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert "user_id" not in tool.parameters_json_schema["properties"]
+    assert "conversation_id" not in tool.parameters_json_schema["properties"]
+    assert tool.runtime_parameters["user_id"] == "end-user-session"
+    assert tool.runtime_parameters["conversation_id"] == "conversation-9"
+
+
+def test_workflow_identity_arguments_keep_a_builder_value_and_fill_blanks_from_the_session() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id="end-user-session",
+        conversation_id="conversation-9",
+        tools=_workflow_tools({"user_id": "workspace-override", "conversation_id": "  "}),
+    )
+
+    assert result.core_tools is not None
+    runtime_parameters = result.core_tools.tools[0].runtime_parameters
+    assert runtime_parameters["user_id"] == "workspace-override"
+    assert runtime_parameters["conversation_id"] == "conversation-9"
+
+
+def test_workflow_identity_arguments_stay_bound_when_the_session_has_no_conversation() -> None:
+    result = _build_workflow(
+        _workflow_identity_tool(),
+        identity_user_id=None,
+        conversation_id=None,
+        tools=_workflow_tools(),
+    )
+
+    assert result.core_tools is not None
+    tool = result.core_tools.tools[0]
+    assert "user_id" not in tool.parameters_json_schema["properties"]
+    assert "conversation_id" not in tool.parameters_json_schema["properties"]
+    assert tool.runtime_parameters["user_id"] == "internal-user"
+    assert tool.runtime_parameters["conversation_id"] == ""

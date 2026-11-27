@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Modifier {{name}}",
   "agentDetail.configure.tools.empty.description": "Les outils permettent à l’agent d’agir, comme effectuer des recherches sur le web ou appeler vos applications",
   "agentDetail.configure.tools.empty.title": "Pas encore d’outils",
+  "agentDetail.configure.tools.identityBinding.conversation": "Laissez vide pour lier la conversation actuelle. Le modèle ne peut pas définir cette valeur.",
+  "agentDetail.configure.tools.identityBinding.user": "Laissez vide pour lier l’utilisateur actuel. Le modèle ne peut pas définir cette valeur.",
   "agentDetail.configure.tools.label": "Outils",
   "agentDetail.configure.tools.moreActions": "Plus d’actions pour {{name}}",
   "agentDetail.configure.tools.removeAction": "Supprimer {{name}}",

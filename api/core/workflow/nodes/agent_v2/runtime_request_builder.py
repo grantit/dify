@@ -52,6 +52,7 @@ from configs import dify_config
 from core.app.entities.app_invoke_entities import DifyRunContext, InvokeFrom
 from core.app.llm import model_access
 from core.plugin.provider_identity import normalize_plugin_daemon_provider_identity
+from core.tools.mcp_tool.identity_bindings import first_present_text, identity_text_from_start_inputs
 from core.workflow.system_variables import SystemVariableKey, get_system_text, get_system_value
 from extensions.tracing import application_tracing_hooks
 from graphon.file import File, FileTransferMethod, FileType, file_manager
@@ -200,6 +201,7 @@ class WorkflowAgentRuntimeRequestBuilder:
                 tools=agent_soul.tools,
                 invoke_from=context.dify_context.invoke_from,
                 knowledge_fs_spaces=tuple(agent_soul.knowledge.spaces),
+                variable_pool=context.variable_pool,
             )
         except WorkflowAgentDifyToolsBuildError as error:
             raise WorkflowAgentRuntimeRequestBuildError(error.error_code, str(error)) from error
@@ -386,10 +388,16 @@ class WorkflowAgentRuntimeRequestBuilder:
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...],
+        variable_pool: VariablePoolReader,
     ) -> WorkflowAgentToolLayers:
         # Production workflow runs intentionally keep existing plugin configs on
         # the direct `dify.plugin.tools` route. This builder emits plugin tools
         # directly and non-plugin Dify tools through `dify.core.tools`.
+        # sys.user_id is the end-user session id for external callers and the
+        # account id for console callers. sys.conversation_id is the chatflow
+        # conversation, or a value forwarded into a workflow run. When a system
+        # value is absent, a trusted Start input with the same meaning is used.
+        # Both are session facts, not model arguments.
         return self._dify_tools_builder.build_layers(
             tenant_id=tenant_id,
             app_id=app_id,
@@ -397,6 +405,14 @@ class WorkflowAgentRuntimeRequestBuilder:
             tools=tools,
             invoke_from=invoke_from,
             knowledge_fs_spaces=knowledge_fs_spaces,
+            identity_user_id=first_present_text(
+                get_system_text(variable_pool, SystemVariableKey.USER_ID),
+                identity_text_from_start_inputs(variable_pool, "user"),
+            ),
+            conversation_id=first_present_text(
+                get_system_text(variable_pool, SystemVariableKey.CONVERSATION_ID),
+                identity_text_from_start_inputs(variable_pool, "conversation"),
+            ),
         )
 
     @staticmethod

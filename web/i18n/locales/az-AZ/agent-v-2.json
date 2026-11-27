@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "{{name}} alətini redaktə et",
   "agentDetail.configure.tools.empty.description": "Alətlər agentə vebdə axtarış etmək və ya tətbiqlərinizi çağırmaq kimi əməliyyatlar yerinə yetirməyə imkan verir",
   "agentDetail.configure.tools.empty.title": "Hələ alət yoxdur",
+  "agentDetail.configure.tools.identityBinding.conversation": "Cari söhbəti bağlamaq üçün boş buraxın. Model bu dəyəri təyin edə bilməz.",
+  "agentDetail.configure.tools.identityBinding.user": "Cari istifadəçini bağlamaq üçün boş buraxın. Model bu dəyəri təyin edə bilməz.",
   "agentDetail.configure.tools.label": "Alətlər",
   "agentDetail.configure.tools.moreActions": "{{name}} aləti üçün əlavə əməliyyatlar",
   "agentDetail.configure.tools.removeAction": "{{name}} alətini çıxar",

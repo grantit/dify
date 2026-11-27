@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Modifica {{name}}",
   "agentDetail.configure.tools.empty.description": "Gli strumenti consentono all’agente di agire, come cercare sul web o chiamare le tue app",
   "agentDetail.configure.tools.empty.title": "Nessuno strumento al momento",
+  "agentDetail.configure.tools.identityBinding.conversation": "Lascia vuoto per associare la conversazione corrente. Il modello non può impostare questo valore.",
+  "agentDetail.configure.tools.identityBinding.user": "Lascia vuoto per associare l’utente corrente. Il modello non può impostare questo valore.",
   "agentDetail.configure.tools.label": "Strumenti",
   "agentDetail.configure.tools.moreActions": "Altre azioni per {{name}}",
   "agentDetail.configure.tools.removeAction": "Rimuovi {{name}}",

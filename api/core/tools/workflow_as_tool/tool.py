@@ -118,7 +118,14 @@ class WorkflowTool(Tool):
 
         self._latest_usage = LLMUsage.empty_usage()
 
-        generator_args: dict[str, Any] = {"inputs": tool_parameters, "files": files}
+        # Always forward the parent session conversation, including a blank
+        # value, so the child workflow does not fall back to a model-filled
+        # Start input. Direct /v1/workflows/run calls omit this key.
+        generator_args: dict[str, Any] = {
+            "inputs": tool_parameters,
+            "files": files,
+            "conversation_id": conversation_id,
+        }
         if self._parent_trace_context:
             generator_args.update(
                 extract_parent_trace_context_from_args({"parent_trace_context": self._parent_trace_context})

@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Editați {{name}}",
   "agentDetail.configure.tools.empty.description": "Instrumentele permit agentului să acționeze, precum căutarea pe web sau apelarea aplicațiilor tale",
   "agentDetail.configure.tools.empty.title": "Niciun instrument încă",
+  "agentDetail.configure.tools.identityBinding.conversation": "Lăsați gol pentru a lega conversația curentă. Modelul nu poate seta această valoare.",
+  "agentDetail.configure.tools.identityBinding.user": "Lăsați gol pentru a lega utilizatorul curent. Modelul nu poate seta această valoare.",
   "agentDetail.configure.tools.label": "Instrumente",
   "agentDetail.configure.tools.moreActions": "Mai multe acțiuni pentru {{name}}",
   "agentDetail.configure.tools.removeAction": "Eliminați {{name}}",

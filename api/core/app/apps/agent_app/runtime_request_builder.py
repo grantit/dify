@@ -139,6 +139,8 @@ class AgentAppRuntimeRequestBuilder:
                 tools=agent_soul.tools,
                 invoke_from=context.dify_context.invoke_from,
                 knowledge_fs_spaces=tuple(agent_soul.knowledge.spaces),
+                identity_user_id=context.dify_context.user_id,
+                conversation_id=context.conversation_id,
             )
         except WorkflowAgentDifyToolsBuildError as error:
             raise AgentAppRuntimeRequestBuildError(error.error_code, str(error)) from error
@@ -281,6 +283,8 @@ class AgentAppRuntimeRequestBuilder:
         tools: AgentSoulToolsConfig,
         invoke_from: InvokeFrom,
         knowledge_fs_spaces: tuple[AgentKnowledgeSpaceConfig, ...],
+        identity_user_id: str | None = None,
+        conversation_id: str | None = None,
     ) -> WorkflowAgentToolLayers:
         # Production Agent App runs intentionally keep existing plugin configs
         # on the direct `dify.plugin.tools` route. This builder emits plugin
@@ -292,6 +296,8 @@ class AgentAppRuntimeRequestBuilder:
             tools=tools,
             invoke_from=invoke_from,
             knowledge_fs_spaces=knowledge_fs_spaces,
+            identity_user_id=identity_user_id,
+            conversation_id=conversation_id,
         )
 
     @staticmethod

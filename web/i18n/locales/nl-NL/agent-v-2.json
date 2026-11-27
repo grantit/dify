@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "{{name}} bewerken",
   "agentDetail.configure.tools.empty.description": "Tools laten de agent handelen, zoals het web doorzoeken of je apps aanroepen",
   "agentDetail.configure.tools.empty.title": "Nog geen tools",
+  "agentDetail.configure.tools.identityBinding.conversation": "Laat leeg om het huidige gesprek te koppelen. Het model kan deze waarde niet instellen.",
+  "agentDetail.configure.tools.identityBinding.user": "Laat leeg om de huidige gebruiker te koppelen. Het model kan deze waarde niet instellen.",
   "agentDetail.configure.tools.label": "Tools",
   "agentDetail.configure.tools.moreActions": "Meer acties voor {{name}}",
   "agentDetail.configure.tools.removeAction": "{{name}} verwijderen",

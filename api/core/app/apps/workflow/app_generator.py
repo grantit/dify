@@ -41,6 +41,7 @@ from core.helper.trace_id_helper import (
 )
 from core.repositories import DifyCoreRepositoryFactory
 from core.repositories.factory import WorkflowExecutionRepository, WorkflowNodeExecutionRepository
+from core.tools.mcp_tool.identity_bindings import present_text
 from core.workflow.node_factory import get_default_root_node_id
 from extensions.ext_database import db
 from extensions.tracing import create_trace_scope
@@ -232,6 +233,10 @@ class WorkflowAppGenerator(BaseAppGenerator):
                     tenant_id=app_model.tenant_id,
                     strict_type_validation=invoke_from == InvokeFrom.SERVICE_API,
                 )
+            # A parent Workflow-as-Tool call always forwards conversation_id in
+            # args, including a blank value. Direct runs such as /v1/workflows/run
+            # omit the key so the runner can use a trusted Start input instead.
+            conversation_id_from_parent = "conversation_id" in args
             # init application generate entity
             application_generate_entity = WorkflowAppGenerateEntity(
                 task_id=task_id or str(uuid.uuid4()),
@@ -248,6 +253,8 @@ class WorkflowAppGenerator(BaseAppGenerator):
                 trace_scope=trace_scope,
                 workflow_execution_id=workflow_run_id,
                 extras=extras,
+                conversation_id=(present_text(args.get("conversation_id")) if conversation_id_from_parent else None),
+                conversation_id_from_parent=conversation_id_from_parent,
             )
 
             contexts.plugin_tool_providers.set({})

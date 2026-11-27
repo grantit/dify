@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Редагувати {{name}}",
   "agentDetail.configure.tools.empty.description": "Інструменти дозволяють агенту діяти — наприклад, шукати в інтернеті або викликати ваші застосунки",
   "agentDetail.configure.tools.empty.title": "Поки що немає інструментів",
+  "agentDetail.configure.tools.identityBinding.conversation": "Залиште порожнім, щоб підставити поточну розмову. Модель не може задати це значення.",
+  "agentDetail.configure.tools.identityBinding.user": "Залиште порожнім, щоб підставити поточного користувача. Модель не може задати це значення.",
   "agentDetail.configure.tools.label": "Інструменти",
   "agentDetail.configure.tools.moreActions": "Більше дій для {{name}}",
   "agentDetail.configure.tools.removeAction": "Видалити {{name}}",

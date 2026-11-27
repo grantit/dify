@@ -505,6 +505,8 @@ export default interface Resources {
     'agentDetail.configure.tools.editAction': 'Edit {{name}}'
     'agentDetail.configure.tools.empty.description': 'Tools let the agent act, like searching the web or calling your apps'
     'agentDetail.configure.tools.empty.title': 'No tools yet'
+    'agentDetail.configure.tools.identityBinding.conversation': 'Leave blank to bind the current conversation. The model cannot set this.'
+    'agentDetail.configure.tools.identityBinding.user': 'Leave blank to bind the current user. The model cannot set this.'
     'agentDetail.configure.tools.label': 'Tools'
     'agentDetail.configure.tools.moreActions': 'More actions for {{name}}'
     'agentDetail.configure.tools.removeAction': 'Remove {{name}}'

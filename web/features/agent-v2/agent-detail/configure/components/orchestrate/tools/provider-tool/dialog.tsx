@@ -6,12 +6,16 @@ import type { ToolWithProvider } from '@/app/components/workflow/types'
 import type { AgentProviderTool } from '@/features/agent-v2/agent-composer/form-state'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useCallback, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useLocale } from '#i18n'
 import SettingBuiltInTool from '@/app/components/app/configuration/config/agent/agent-tools/setting-built-in-tool'
 import {
   agentComposerToolsAtom,
   agentComposerToolSettingsAtom,
   saveProviderToolActionSettingsAtom,
 } from '@/features/agent-v2/agent-composer/store-modules/tools'
+import { getPluginLanguage } from '@/i18n/metadata'
+import { withMcpIdentityFormBindings } from './identity-bindings'
 
 const localize = (value: string) => ({
   en_US: value,
@@ -58,6 +62,16 @@ export function ProviderToolSettingsDialog({
   const tools = useAtomValue(agentComposerToolsAtom)
   const toolSettings = useAtomValue(agentComposerToolSettingsAtom)
   const saveProviderToolActionSettings = useSetAtom(saveProviderToolActionSettingsAtom)
+  const locale = useLocale()
+  const language = getPluginLanguage(locale)
+  const { t } = useTranslation(['agentV2'])
+  const identityHints = useMemo(
+    () => ({
+      user: t(($) => $['agentDetail.configure.tools.identityBinding.user']),
+      conversation: t(($) => $['agentDetail.configure.tools.identityBinding.conversation']),
+    }),
+    [t],
+  )
   const currentTarget = useMemo(() => {
     if (!settingTarget) return null
 
@@ -72,8 +86,9 @@ export function ProviderToolSettingsDialog({
   const toolCollection = useMemo(() => {
     if (!currentTarget) return null
 
-    return collection ?? createFallbackToolCollection(currentTarget.tool)
-  }, [collection, currentTarget])
+    const resolved = collection ?? createFallbackToolCollection(currentTarget.tool)
+    return withMcpIdentityFormBindings(resolved, identityHints, language)
+  }, [collection, currentTarget, identityHints, language])
   const handleSave = useCallback(
     (value: Record<string, unknown>) => {
       if (!currentTarget) return

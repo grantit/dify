@@ -25,7 +25,10 @@ from core.app.entities.app_invoke_entities import DifyRunContext, InvokeFrom, Us
 from core.app.llm.model_access import ModelRuntimeProfile
 from core.workflow.file_reference import build_file_reference
 from core.workflow.nodes.agent.agent_node import AgentNode as LegacyAgentNode
-from core.workflow.nodes.agent_v2.dify_tools_builder import WorkflowAgentDifyToolsBuilder
+from core.workflow.nodes.agent_v2.dify_tools_builder import (
+    WorkflowAgentDifyToolsBuilder,
+    WorkflowAgentToolLayers,
+)
 from core.workflow.nodes.agent_v2.runtime_request_builder import (
     WorkflowAgentRuntimeBuildContext,
     WorkflowAgentRuntimeRequestBuilder,
@@ -124,12 +127,24 @@ class CapturingPluginLayerBuilder:
         self.last_invoke_from: InvokeFrom | None = None
         self.knowledge_fs_spaces = ()
 
-    def build_layers(self, *, tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces=()):
+    def build_layers(
+        self,
+        *,
+        tenant_id,
+        app_id,
+        user_id,
+        tools,
+        invoke_from,
+        knowledge_fs_spaces=(),
+        identity_user_id=None,
+        conversation_id=None,
+    ):
         assert tenant_id == "tenant-1"
         assert app_id == "app-1"
         assert user_id == "user-1"
         self.last_invoke_from = invoke_from
         self.knowledge_fs_spaces = knowledge_fs_spaces
+        del identity_user_id, conversation_id
         if not tools.dify_tools:
             return SimpleNamespace(plugin_tools=None, core_tools=None, exposed_tool_names=lambda: [])
         return SimpleNamespace(
@@ -155,11 +170,22 @@ class CapturingPluginLayerBuilder:
 
 
 class FakeCoreLayerBuilder:
-    def build_layers(self, *, tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces=()):
+    def build_layers(
+        self,
+        *,
+        tenant_id,
+        app_id,
+        user_id,
+        tools,
+        invoke_from,
+        knowledge_fs_spaces=(),
+        identity_user_id=None,
+        conversation_id=None,
+    ):
         assert tenant_id == "tenant-1"
         assert app_id == "app-1"
         assert user_id == "user-1"
-        del tools, invoke_from
+        del tools, invoke_from, identity_user_id, conversation_id
         return SimpleNamespace(
             plugin_tools=None,
             core_tools=DifyCoreToolsLayerConfig(
@@ -247,6 +273,162 @@ def _context() -> WorkflowAgentRuntimeBuildContext:
         binding_id="binding-1",
         backend_binding_ref="binding-ref-1",
     )
+
+
+def test_tool_layers_receive_sys_user_and_conversation() -> None:
+    """Chatflow system variables are the trusted identity passed into tool preparation."""
+
+    class _IdentityPool:
+        def get(self, selector: Sequence[str]) -> StringSegment | None:
+            if list(selector) == ["sys", "user_id"]:
+                return StringSegment(value="end-user-session")
+            if list(selector) == ["sys", "conversation_id"]:
+                return StringSegment(value="conversation-9")
+            return None
+
+        def get_by_prefix(self, prefix: str) -> dict[str, object]:
+            del prefix
+            return {}
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.identity_user_id: str | None = None
+            self.conversation_id: str | None = None
+
+        def build_layers(
+            self,
+            *,
+            tenant_id: str,
+            app_id: str,
+            user_id: str | None,
+            tools: AgentSoulToolsConfig,
+            invoke_from: InvokeFrom,
+            knowledge_fs_spaces: tuple[object, ...] = (),
+            identity_user_id: str | None = None,
+            conversation_id: str | None = None,
+        ) -> WorkflowAgentToolLayers:
+            del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+            self.identity_user_id = identity_user_id
+            self.conversation_id = conversation_id
+            return WorkflowAgentToolLayers()
+
+    recorder = _Recorder()
+    context = replace(_context(), variable_pool=_IdentityPool())
+    WorkflowAgentRuntimeRequestBuilder(dify_tools_builder=recorder)._build_tool_layers(
+        tenant_id=context.dify_context.tenant_id,
+        app_id=context.dify_context.app_id,
+        user_id=context.dify_context.user_id,
+        tools=AgentSoulToolsConfig(),
+        invoke_from=context.dify_context.invoke_from,
+        knowledge_fs_spaces=(),
+        variable_pool=context.variable_pool,
+    )
+
+    assert recorder.identity_user_id == "end-user-session"
+    assert recorder.conversation_id == "conversation-9"
+
+
+def test_tool_layers_fall_back_to_start_inputs_when_sys_conversation_is_missing() -> None:
+    """Direct workflow runs have no sys.conversation_id; a Start input is trusted."""
+
+    class _StartPool:
+        def get(self, selector: Sequence[str]) -> StringSegment | None:
+            if list(selector) == ["sys", "user_id"]:
+                return StringSegment(value="api-user")
+            return None
+
+        def get_by_prefix(self, prefix: str) -> dict[str, object]:
+            if prefix == "start":
+                return {"user_id": "start-user", "conversation_id": "from-start"}
+            return {}
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.identity_user_id: str | None = None
+            self.conversation_id: str | None = None
+
+        def build_layers(
+            self,
+            *,
+            tenant_id: str,
+            app_id: str,
+            user_id: str | None,
+            tools: AgentSoulToolsConfig,
+            invoke_from: InvokeFrom,
+            knowledge_fs_spaces: tuple[object, ...] = (),
+            identity_user_id: str | None = None,
+            conversation_id: str | None = None,
+        ) -> WorkflowAgentToolLayers:
+            del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+            self.identity_user_id = identity_user_id
+            self.conversation_id = conversation_id
+            return WorkflowAgentToolLayers()
+
+    recorder = _Recorder()
+    context = replace(_context(), variable_pool=_StartPool())
+    WorkflowAgentRuntimeRequestBuilder(dify_tools_builder=recorder)._build_tool_layers(
+        tenant_id=context.dify_context.tenant_id,
+        app_id=context.dify_context.app_id,
+        user_id=context.dify_context.user_id,
+        tools=AgentSoulToolsConfig(),
+        invoke_from=context.dify_context.invoke_from,
+        knowledge_fs_spaces=(),
+        variable_pool=context.variable_pool,
+    )
+
+    assert recorder.identity_user_id == "api-user"
+    assert recorder.conversation_id == "from-start"
+
+
+def test_tool_layers_prefer_sys_identity_over_start_inputs() -> None:
+    class _BothPool:
+        def get(self, selector: Sequence[str]) -> StringSegment | None:
+            if list(selector) == ["sys", "user_id"]:
+                return StringSegment(value="sys-user")
+            if list(selector) == ["sys", "conversation_id"]:
+                return StringSegment(value="sys-conversation")
+            return None
+
+        def get_by_prefix(self, prefix: str) -> dict[str, object]:
+            if prefix == "start":
+                return {"user_id": "start-user", "conversation_id": "start-conversation"}
+            return {}
+
+    class _Recorder:
+        def __init__(self) -> None:
+            self.identity_user_id: str | None = None
+            self.conversation_id: str | None = None
+
+        def build_layers(
+            self,
+            *,
+            tenant_id: str,
+            app_id: str,
+            user_id: str | None,
+            tools: AgentSoulToolsConfig,
+            invoke_from: InvokeFrom,
+            knowledge_fs_spaces: tuple[object, ...] = (),
+            identity_user_id: str | None = None,
+            conversation_id: str | None = None,
+        ) -> WorkflowAgentToolLayers:
+            del tenant_id, app_id, user_id, tools, invoke_from, knowledge_fs_spaces
+            self.identity_user_id = identity_user_id
+            self.conversation_id = conversation_id
+            return WorkflowAgentToolLayers()
+
+    recorder = _Recorder()
+    WorkflowAgentRuntimeRequestBuilder(dify_tools_builder=recorder)._build_tool_layers(
+        tenant_id="tenant-1",
+        app_id="app-1",
+        user_id="user-1",
+        tools=AgentSoulToolsConfig(),
+        invoke_from=InvokeFrom.SERVICE_API,
+        knowledge_fs_spaces=(),
+        variable_pool=_BothPool(),
+    )
+
+    assert recorder.identity_user_id == "sys-user"
+    assert recorder.conversation_id == "sys-conversation"
 
 
 @pytest.mark.parametrize("preview", [False, True])

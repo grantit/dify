@@ -332,6 +332,47 @@ def test_legacy_tool_disables_human_input(
     assert call_kwargs["allow_human_input"] is False
 
 
+def test_workflow_tool_forwards_parent_conversation_id_to_generator(
+    monkeypatch: pytest.MonkeyPatch,
+    sqlite_session: Session,
+):
+    tool = _build_tool()
+    user = make_account(account_id="test_user")
+    generate, generate_calls = _record_calls(return_value={"data": {}})
+
+    monkeypatch.setattr(tool, "_get_app", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_get_workflow", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_resolve_user", lambda *args, **kwargs: user)
+    monkeypatch.setattr("core.app.apps.workflow.app_generator.WorkflowAppGenerator.generate", generate)
+
+    list(tool.invoke(sqlite_session, "test_user", {}, conversation_id="parent-conversation"))
+
+    call_kwargs = generate_calls[-1]
+    assert call_kwargs["args"]["conversation_id"] == "parent-conversation"
+    assert "conversation_id" in call_kwargs["args"]
+
+
+def test_workflow_tool_forwards_a_blank_parent_conversation_id(
+    monkeypatch: pytest.MonkeyPatch,
+    sqlite_session: Session,
+):
+    """A missing parent conversation must still be forwarded so Start inputs cannot fill it."""
+    tool = _build_tool()
+    user = make_account(account_id="test_user")
+    generate, generate_calls = _record_calls(return_value={"data": {}})
+
+    monkeypatch.setattr(tool, "_get_app", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_get_workflow", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_resolve_user", lambda *args, **kwargs: user)
+    monkeypatch.setattr("core.app.apps.workflow.app_generator.WorkflowAppGenerator.generate", generate)
+
+    list(tool.invoke(sqlite_session, "test_user", {"conversation_id": "model-invented"}))
+
+    call_kwargs = generate_calls[-1]
+    assert "conversation_id" in call_kwargs["args"]
+    assert call_kwargs["args"]["conversation_id"] is None
+
+
 def test_workflow_tool_passes_parent_trace_context_from_runtime(
     monkeypatch: pytest.MonkeyPatch,
     sqlite_session: Session,

@@ -1332,6 +1332,165 @@ class TestWorkflowAppRunnerSingleNodeCases:
         assert init_graph.call_args.kwargs["call_depth"] == 4
         assert init_graph.call_args.kwargs["capture_agent_evaluation_trace"] is True
 
+    @staticmethod
+    def test_prepare_sets_sys_conversation_id_from_start_input(queue_manager: WorkflowAppQueueManager) -> None:
+        app_generate_entity = WorkflowAppGenerateEntity(
+            user_from=UserFrom.END_USER,
+            app_config=WorkflowUIBasedAppConfig(
+                app_id="app", tenant_id="tenant", workflow_id="workflow", app_mode=AppMode.WORKFLOW
+            ),
+            inputs={"query": "hello", "conversation_id": "from-start"},
+            files=[],
+            user_id="user",
+            invoke_from=InvokeFrom.SERVICE_API,
+            workflow_execution_id="execution-id",
+            task_id="task-id",
+            stream=True,
+        )
+        workflow = Workflow(
+            tenant_id="tenant",
+            app_id="app",
+            id="workflow",
+            type=ModelWorkflowType.WORKFLOW,
+            version="v1",
+            graph=json.dumps({"nodes": [], "edges": []}),
+        )
+        workflow.environment_variables = []
+        runner = WorkflowAppRunner(
+            application_generate_entity=app_generate_entity,
+            queue_manager=queue_manager,
+            variable_loader=MagicMock(),
+            workflow=workflow,
+            system_user_id="system-user",
+        )
+        mock_workflow_entry = MagicMock()
+        mock_workflow_entry.graph_engine = MagicMock()
+        mock_workflow_entry.graph_engine.layer = MagicMock()
+        mock_workflow_entry.run.return_value = iter([])
+
+        with (
+            patch("core.app.apps.workflow.app_runner.RedisChannel"),
+            patch("core.app.apps.workflow.app_runner.redis_client"),
+            patch("core.app.apps.workflow.app_runner.WorkflowEntry", return_value=mock_workflow_entry),
+            patch("core.app.apps.workflow.app_runner.build_system_variables", return_value={}) as build_sys,
+            patch("core.app.apps.workflow.app_runner.build_bootstrap_variables", return_value=[]),
+            patch("core.app.apps.workflow.app_runner.add_variables_to_pool"),
+            patch("core.app.apps.workflow.app_runner.get_default_root_node_id", return_value="start"),
+            patch("core.app.apps.workflow.app_runner.add_node_inputs_to_pool"),
+            patch.object(runner, "_init_graph", return_value=MagicMock()),
+        ):
+            runner.prepare()
+
+        assert build_sys.call_args.kwargs["conversation_id"] == "from-start"
+
+    @staticmethod
+    def test_prepare_keeps_a_blank_parent_conversation_id(queue_manager: WorkflowAppQueueManager) -> None:
+        app_generate_entity = WorkflowAppGenerateEntity(
+            user_from=UserFrom.END_USER,
+            app_config=WorkflowUIBasedAppConfig(
+                app_id="app", tenant_id="tenant", workflow_id="workflow", app_mode=AppMode.WORKFLOW
+            ),
+            inputs={"conversation_id": "from-start"},
+            files=[],
+            user_id="user",
+            invoke_from=InvokeFrom.SERVICE_API,
+            workflow_execution_id="execution-id",
+            task_id="task-id",
+            stream=True,
+            conversation_id=None,
+            conversation_id_from_parent=True,
+        )
+        workflow = Workflow(
+            tenant_id="tenant",
+            app_id="app",
+            id="workflow",
+            type=ModelWorkflowType.WORKFLOW,
+            version="v1",
+            graph=json.dumps({"nodes": [], "edges": []}),
+        )
+        workflow.environment_variables = []
+        runner = WorkflowAppRunner(
+            application_generate_entity=app_generate_entity,
+            queue_manager=queue_manager,
+            variable_loader=MagicMock(),
+            workflow=workflow,
+            system_user_id="system-user",
+        )
+        mock_workflow_entry = MagicMock()
+        mock_workflow_entry.graph_engine = MagicMock()
+        mock_workflow_entry.graph_engine.layer = MagicMock()
+        mock_workflow_entry.run.return_value = iter([])
+
+        with (
+            patch("core.app.apps.workflow.app_runner.RedisChannel"),
+            patch("core.app.apps.workflow.app_runner.redis_client"),
+            patch("core.app.apps.workflow.app_runner.WorkflowEntry", return_value=mock_workflow_entry),
+            patch("core.app.apps.workflow.app_runner.build_system_variables", return_value={}) as build_sys,
+            patch("core.app.apps.workflow.app_runner.build_bootstrap_variables", return_value=[]),
+            patch("core.app.apps.workflow.app_runner.add_variables_to_pool"),
+            patch("core.app.apps.workflow.app_runner.get_default_root_node_id", return_value="start"),
+            patch("core.app.apps.workflow.app_runner.add_node_inputs_to_pool"),
+            patch.object(runner, "_init_graph", return_value=MagicMock()),
+        ):
+            runner.prepare()
+
+        assert build_sys.call_args.kwargs["conversation_id"] is None
+
+    @staticmethod
+    def test_prepare_forwards_parent_conversation_id_over_start_input(
+        queue_manager: WorkflowAppQueueManager,
+    ) -> None:
+        app_generate_entity = WorkflowAppGenerateEntity(
+            user_from=UserFrom.END_USER,
+            app_config=WorkflowUIBasedAppConfig(
+                app_id="app", tenant_id="tenant", workflow_id="workflow", app_mode=AppMode.WORKFLOW
+            ),
+            inputs={"conversation_id": "from-start"},
+            files=[],
+            user_id="user",
+            invoke_from=InvokeFrom.SERVICE_API,
+            workflow_execution_id="execution-id",
+            task_id="task-id",
+            stream=True,
+            conversation_id="parent-conversation",
+            conversation_id_from_parent=True,
+        )
+        workflow = Workflow(
+            tenant_id="tenant",
+            app_id="app",
+            id="workflow",
+            type=ModelWorkflowType.WORKFLOW,
+            version="v1",
+            graph=json.dumps({"nodes": [], "edges": []}),
+        )
+        workflow.environment_variables = []
+        runner = WorkflowAppRunner(
+            application_generate_entity=app_generate_entity,
+            queue_manager=queue_manager,
+            variable_loader=MagicMock(),
+            workflow=workflow,
+            system_user_id="system-user",
+        )
+        mock_workflow_entry = MagicMock()
+        mock_workflow_entry.graph_engine = MagicMock()
+        mock_workflow_entry.graph_engine.layer = MagicMock()
+        mock_workflow_entry.run.return_value = iter([])
+
+        with (
+            patch("core.app.apps.workflow.app_runner.RedisChannel"),
+            patch("core.app.apps.workflow.app_runner.redis_client"),
+            patch("core.app.apps.workflow.app_runner.WorkflowEntry", return_value=mock_workflow_entry),
+            patch("core.app.apps.workflow.app_runner.build_system_variables", return_value={}) as build_sys,
+            patch("core.app.apps.workflow.app_runner.build_bootstrap_variables", return_value=[]),
+            patch("core.app.apps.workflow.app_runner.add_variables_to_pool"),
+            patch("core.app.apps.workflow.app_runner.get_default_root_node_id", return_value="start"),
+            patch("core.app.apps.workflow.app_runner.add_node_inputs_to_pool"),
+            patch.object(runner, "_init_graph", return_value=MagicMock()),
+        ):
+            runner.prepare()
+
+        assert build_sys.call_args.kwargs["conversation_id"] == "parent-conversation"
+
 
 def _save_form(session: Session, *, status: HumanInputFormStatus) -> HumanInputForm:
     now = datetime.now(UTC)

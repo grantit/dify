@@ -39,6 +39,7 @@ from core.tools.errors import (
     ToolProviderCredentialValidationError,
     ToolProviderNotFoundError,
 )
+from core.tools.mcp_tool.identity_bindings import apply_mcp_identity_bindings
 from core.tools.tool_engine import ToolEngine
 from core.tools.tool_manager import ToolManager
 from core.tools.utils.message_transformer import ToolFileMessageTransformer
@@ -120,6 +121,16 @@ class AgentToolInnerService:
             tool_runtime.runtime.tool_invoke_from = (
                 ToolInvokeFrom.WORKFLOW if request.caller.workflow_id is not None else ToolInvokeFrom.AGENT
             )
+            if agent_tool.provider_type in {ToolProviderType.MCP, ToolProviderType.WORKFLOW}:
+                # ToolManager reloads the provider declaration, which can drop
+                # identity values that were prepared as runtime parameters.
+                # Reapply them from this request before model arguments are merged.
+                apply_mcp_identity_bindings(
+                    tool_runtime,
+                    user_id=request.caller.user_id,
+                    conversation_id=request.caller.conversation_id,
+                    configured_parameters=request.tool.runtime_parameters,
+                )
             messages = ToolEngine.generic_invoke(
                 session=session,
                 tool=tool_runtime,

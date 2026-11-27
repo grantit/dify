@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "ویرایش {{name}}",
   "agentDetail.configure.tools.empty.description": "ابزارها به عامل اجازه می‌دهند عمل کند، مانند جستجوی وب یا فراخوانی برنامه‌های شما",
   "agentDetail.configure.tools.empty.title": "هنوز ابزاری وجود ندارد",
+  "agentDetail.configure.tools.identityBinding.conversation": "برای اتصال گفتگوی فعلی خالی بگذارید. مدل نمی‌تواند این مقدار را تنظیم کند.",
+  "agentDetail.configure.tools.identityBinding.user": "برای اتصال کاربر فعلی خالی بگذارید. مدل نمی‌تواند این مقدار را تنظیم کند.",
   "agentDetail.configure.tools.label": "ابزارها",
   "agentDetail.configure.tools.moreActions": "اقدامات بیشتر برای {{name}}",
   "agentDetail.configure.tools.removeAction": "حذف {{name}}",

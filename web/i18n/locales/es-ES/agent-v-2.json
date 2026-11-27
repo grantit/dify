@@ -271,6 +271,8 @@
   "agentDetail.configure.tools.editAction": "Editar {{name}}",
   "agentDetail.configure.tools.empty.description": "Las herramientas permiten al agente actuar, como buscar en la web o invocar tus aplicaciones",
   "agentDetail.configure.tools.empty.title": "Aún no hay herramientas",
+  "agentDetail.configure.tools.identityBinding.conversation": "Déjelo vacío para vincular la conversación actual. El modelo no puede establecer este valor.",
+  "agentDetail.configure.tools.identityBinding.user": "Déjelo vacío para vincular al usuario actual. El modelo no puede establecer este valor.",
   "agentDetail.configure.tools.label": "Herramientas",
   "agentDetail.configure.tools.moreActions": "Más acciones para {{name}}",
   "agentDetail.configure.tools.removeAction": "Eliminar {{name}}",

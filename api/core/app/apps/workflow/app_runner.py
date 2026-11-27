@@ -18,6 +18,7 @@ from core.app.entities.app_invoke_entities import (
     WorkflowAppGenerateEntity,
     get_credit_usage_app_type,
 )
+from core.tools.mcp_tool.identity_bindings import resolve_workflow_conversation_id
 from core.workflow.node_factory import get_default_root_node_id
 from core.workflow.snippet_start import get_compatible_start_aliases
 from core.workflow.system_variables import build_bootstrap_variables, build_system_variables
@@ -69,6 +70,19 @@ class WorkflowAppRunner(WorkflowBasedAppRunner):
         self._root_node_id = root_node_id
         self._resume_graph_runtime_state = graph_runtime_state
         self._response_stream_filter = response_stream_filter
+
+    def _workflow_conversation_id(self) -> str | None:
+        """Return the trusted conversation id for this workflow run, if any.
+
+        A parent Workflow-as-Tool session wins, including when it is blank.
+        Otherwise a matching Start input from a direct run may be used.
+        """
+        entity = self.application_generate_entity
+        return resolve_workflow_conversation_id(
+            forwarded_conversation_id=entity.conversation_id,
+            forwarded=entity.conversation_id_from_parent,
+            inputs=entity.inputs,
+        )
 
     @override
     def prepare(self) -> PreparedWorkflowRun | None:
@@ -122,6 +136,7 @@ class WorkflowAppRunner(WorkflowBasedAppRunner):
                 timestamp=int(naive_utc_now().timestamp()),
                 workflow_id=app_config.workflow_id,
                 workflow_execution_id=self.application_generate_entity.workflow_execution_id,
+                conversation_id=self._workflow_conversation_id(),
             )
             variable_pool = VariablePool()
             add_variables_to_pool(
